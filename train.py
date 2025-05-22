@@ -5,6 +5,7 @@ from data import get_dataloaders
 from model import CIFAR10Net
 from utils import save_checkpoint, AverageMeter
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm  # Added for progress bar
 SEED = 42
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
@@ -16,7 +17,7 @@ np.random.seed(SEED)
 import argparse
 
 def train(args):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     train_loader, val_loader, _ = get_dataloaders(
         batch_size=args.batch_size,
         num_workers=args.workers
@@ -33,7 +34,8 @@ def train(args):
         losses = AverageMeter()
         correct = 0
         total = 0
-        for inputs, targets in train_loader:
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}")
+        for inputs, targets in progress_bar:
             inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
             outputs = net(inputs)
@@ -46,6 +48,10 @@ def train(args):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
+            progress_bar.set_postfix({
+                'Loss': f'{losses.avg:.4f}',
+                'Acc': f'{100. * correct / total:.2f}%'
+            })
         train_acc = 100. * correct / total
         val_acc = validate(net, val_loader, criterion, device)
         scheduler.step()
@@ -79,6 +85,6 @@ if __name__ == '__main__':
         batch_size = 128
         epochs = 100
         lr = 0.1
-        workers = 4
+        workers = 2
     
     train(Args())
